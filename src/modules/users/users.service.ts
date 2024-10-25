@@ -67,6 +67,29 @@ export class UsersService {
         }
     }
 
+    // ========== User  ==========
+
+    createUser(createUserDto: CreateUserDto): User {
+      const newUser = {userId: faker.string.uuid(), ...createUserDto};
+      this.users.push(newUser);
+      return newUser;
+    }
+
+    loginUser(loginUserDto: LoginUserDto): LoginResponse  {
+      const { email, password } = loginUserDto;
+      const user = this.users.find(user => user.email === email);
+
+      if (!user || user.password !== password) {
+              throw new UnauthorizedException('Email or Password is invalid');
+      }
+      const JWT = faker.string.uuid();
+      return {user, JWT};
+    }
+
+    getUserById(id: string): User {
+      return this.users.find(user => user.userId === id);
+    }
+
     getAllUsers(paginationQuery: PaginationQueryDto): Paginator {
         const { limit = 10, page = 1 } = paginationQuery;
         const start = (page - 1) * limit;
@@ -82,10 +105,6 @@ export class UsersService {
           limit,
           totalPages,
         }
-    }
-
-    getUserById(id: string): User {
-      return this.users.find(user => user.userId === id);
     }
 
     getProfileUserById(id: string): User {
@@ -110,24 +129,6 @@ export class UsersService {
       }
       throw new UnauthorizedException('User session not found');
     }
-  
-    createUser(createUserDto: CreateUserDto): User {
-      const newUser = {userId: faker.string.uuid(), ...createUserDto};
-      this.users.push(newUser);
-      return newUser;
-    }
-
-    loginUser(loginUserDto: LoginUserDto): LoginResponse  {
-      const { email, password } = loginUserDto;
-      const user = this.users.find(user => user.email === email);
-
-      if (!user || user.password !== password) {
-              throw new UnauthorizedException('Email or Password is invalid');
-      }
-      const JWT = faker.string.uuid();
-      return {user, JWT};
-    }
-
     updateUser(id: string, updateUserDto: UpdateUserDto): User {
       const userIndex = this.users.findIndex(user => user.userId === id);
       if (userIndex === -1) {
@@ -138,6 +139,8 @@ export class UsersService {
       return this.users[userIndex];
     }
 
+    // ========== Admin Users ==========  
+
     adminUpdateUser(id: string, updateUserDto: UpdateUserDto): User {
       const userIndex = this.users.findIndex(user => user.userId === id);
       if (userIndex === -1) {
@@ -147,4 +150,18 @@ export class UsersService {
       this.users[userIndex] = {...this.users[userIndex], ...updateUserDto};
       return this.users[userIndex];
     }
+
+    userStatus(id: string): User {
+      const userIndex = this.users.findIndex(user => user.userId === id);
+      if (userIndex === -1) {
+          return null;
+      }
+      this.users[userIndex].isActive = !this.users[userIndex].isActive;
+      return this.users[userIndex];
+    }
+
+    getAdminUserById(id: string): User {
+      return this.users.find(user => user.userId === id);
+    }
+
 }

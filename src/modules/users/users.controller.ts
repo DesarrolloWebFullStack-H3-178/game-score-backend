@@ -1,55 +1,64 @@
 import { Controller, Get, Query, Param, Post,Body, Put, HttpCode, Patch, NotFoundException } from '@nestjs/common';
-import { UsersService, User, SessionResponse } from './users.service';
+import { UsersService, User, LoginResponse, SessionResponse } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { ScoresService, Score } from '../scores/scores.service';
+import { CreateUserDto } from './dto/create-user.dto';
+import { LoginUserDto } from './dto/login-user.dto';
 import { PaginationQueryDto } from 'src/commons/dto/pagination-query.dto';
 
 @Controller('users')
 export class UsersController {
-    constructor(
-        private readonly usersService: UsersService,
-        private readonly scoresService: ScoresService
-    ) {}
+    constructor(private readonly usersService: UsersService) {}
 
-    // ========== Admin Users ==========
-    @Get('admin')
-    adminGetAllUsers(@Query() paginationQuery: PaginationQueryDto) {
-        return this.usersService.getAllUsers(paginationQuery);
+    // ============== Auth ================
+
+    @Post('auth/register')
+        userRegister(@Body() createUserDto: CreateUserDto): User {
+        return this.usersService.createUser(createUserDto);
     }
 
-    /* @Put('admin/:id')
-    adminUpdateUser(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto): User {
-        return this.usersService.adminUpdateUser(id, updateUserDto);
-    } */
-    
+    @Post('auth/login')
+        userLogin(@Body() loginUserDto: LoginUserDto): LoginResponse {
+        return this.usersService.loginUser(loginUserDto);
+    }
 
-    /* @Patch('admin/:id')
-    updateUser(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto): User {
-        return this.usersService.updateUser(id, updateUserDto);
-    } */
-
-   // ========== User  ==========
+    // ========== User ===========
     @Get('profile/:id')
-    getUserProfileById(@Param('id') id: string ): User | undefined {
+        getUserById(@Param('id') id: string ): User | undefined {
         return this.usersService.getProfileUserById(id);
-    }
-    @Get('session/:id')
-    getUserSessionById(@Param('id') id: string): SessionResponse {
-    return this.usersService.getSessionUserById(id);
     }
 
     @Put('profile/:id')
-    updateUser(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto): User {
+        userUpdate(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto): User {
         return this.usersService.updateUser(id, updateUserDto);
     }
 
-    @Get('scores/:scoreId')
-    getScoreById(@Param('scoreId') scoreId: string): Score {
-        const score = this.scoresService.getScoreById(scoreId);
-        if (!score) {
-            throw new NotFoundException(`Score with ID ${scoreId} not found`);
+    @Get('session/:id')
+        getUserSessionId(@Param('id') id: string): SessionResponse {
+        return this.usersService.getSessionUserById(id);
+    }
+
+    // ========== Admin Users ==========
+
+    @Put('admin/profile/:id')
+        userAdminUpdate(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto): User {
+        return this.usersService.adminUpdateUser(id, updateUserDto);
+    }
+
+    @Patch('admin/:id')
+        blockUserAdmin(@Param('id') id: string): User {
+        const user = this.usersService.userStatus(id);
+        if (!user) {
+            throw new NotFoundException(`User with ID ${id} not found`);
         }
-        return score;
+        return user;
     }
     
+    @Get('admin')
+        getAllUsersAdmin(@Query() paginationQuery: PaginationQueryDto) {
+        return this.usersService.getAllUsers(paginationQuery);
+    }
+    @Get('admin/:id')
+        getUserByIdAdmin(@Param('id') id: string ): User | undefined {
+        return this.usersService.getAdminUserById(id);
+    }
 }
