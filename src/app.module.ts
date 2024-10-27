@@ -3,8 +3,9 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ScoresModule } from './modules/scores/scores.module';
 import { UsersModule } from './modules/users/users.module';
+import { AuthModule } from './modules/auth/auth.module';
 @Module({
-  imports: [ ScoresModule, UsersModule ],
+  imports: [ ScoresModule, UsersModule, AuthModule ],
   controllers: [AppController],
   providers: [AppService],
 })

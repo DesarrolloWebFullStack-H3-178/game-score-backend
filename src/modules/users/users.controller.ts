@@ -1,9 +1,10 @@
-import { Controller, Get, Query, Param, Post,Body, Put, HttpCode, Patch, NotFoundException } from '@nestjs/common';
-import { UsersService, User, LoginResponse, SessionResponse } from './users.service';
+import { Controller, Get, Query, Param, Post,Body, Put, HttpCode, Patch, NotFoundException, UseGuards } from '@nestjs/common';
+import { UsersService, User, SessionResponse } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { CreateUserDto } from './dto/create-user.dto';
-import { LoginUserDto } from './dto/login-user.dto';
 import { PaginationQueryDto } from 'src/commons/dto/pagination-query.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('users')
 export class UsersController {
@@ -11,15 +12,15 @@ export class UsersController {
 
     // ============== Auth ================
 
-    @Post('auth/register')
+    /* @Post('auth/register')
         userRegister(@Body() createUserDto: CreateUserDto): User {
         return this.usersService.createUser(createUserDto);
-    }
+    } */
 
-    @Post('auth/login')
+    /* @Post('auth/login')
         userLogin(@Body() loginUserDto: LoginUserDto): LoginResponse {
         return this.usersService.loginUser(loginUserDto);
-    }
+    } */
 
     // ========== User ===========
     @Get('profile/:id')
@@ -53,6 +54,8 @@ export class UsersController {
         return user;
     }
     
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('Admin')
     @Get('admin')
         getAllUsersAdmin(@Query() paginationQuery: PaginationQueryDto) {
         return this.usersService.getAllUsers(paginationQuery);

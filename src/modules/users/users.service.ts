@@ -5,6 +5,7 @@ import { PaginationQueryDto } from 'src/commons/dto/pagination-query.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { LoginUserDto } from './dto/login-user.dto';
+import { hash, compare } from 'bcryptjs';
 
 // Create User
 
@@ -14,17 +15,17 @@ export interface User {
     username: string;
     email: string;
     password: string;
-    role: string;
+    roles: string[];
     avatar: string;
     isActive: boolean;
-  }
+}
 
 // User login 
 
-export interface LoginResponse {
+/* export interface LoginResponse {
     user: User;
     JWT: string;
-}
+} */
 
 export interface Paginator {
   data: [];
@@ -59,8 +60,8 @@ export class UsersService {
               name: faker.internet.userName(),
               username: faker.internet.userName(),
               email: faker.internet.email(),
-              password: faker.internet.password(),
-              role: faker.helpers.arrayElement(['player', 'admin']),
+              password: hash('123456', 10),
+              roles: [faker.helpers.arrayElement(['Player', 'Admin'])],
               avatar: faker.image.avatar(),
               isActive: true,
             });
@@ -75,7 +76,7 @@ export class UsersService {
       return newUser;
     }
 
-    loginUser(loginUserDto: LoginUserDto): LoginResponse  {
+    /* loginUser(loginUserDto: LoginUserDto): LoginResponse  {
       const { email, password } = loginUserDto;
       const user = this.users.find(user => user.email === email);
 
@@ -84,7 +85,7 @@ export class UsersService {
       }
       const JWT = faker.string.uuid();
       return {user, JWT};
-    }
+    } */
 
     getUserById(id: string): User {
       return this.users.find(user => user.userId === id);
@@ -105,6 +106,16 @@ export class UsersService {
           limit,
           totalPages,
         }
+    }
+
+    validateUser(username:string, password:string) {
+      const user  = this.users.find(user => user.username === username);
+
+      if( user && compare(password, user.password)){
+        return user;
+      }
+
+      return 'No hay user';
     }
 
     getProfileUserById(id: string): User {
