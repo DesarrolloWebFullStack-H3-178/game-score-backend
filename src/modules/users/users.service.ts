@@ -63,7 +63,7 @@ export class UsersService {
               password: hash('123456', 10),
               roles: [faker.helpers.arrayElement(['Player', 'Admin'])],
               avatar: faker.image.avatar(),
-              isActive: true,
+              isActive: faker.helpers.arrayElements([true, false], 5)
             });
         }
     }
@@ -108,8 +108,8 @@ export class UsersService {
         }
     }
 
-    validateUser(username:string, password:string) {
-      const user  = this.users.find(user => user.username === username);
+    validateUser(email:string, password:string) {
+      const user  = this.users.find(user => user.email === email);
 
       if( user && compare(password, user.password)){
         return user;
@@ -174,5 +174,4 @@ export class UsersService {
     getAdminUserById(id: string): User {
       return this.users.find(user => user.userId === id);
     }
-
 }

@@ -15,8 +15,7 @@ export class UsersController {
     /* @Post('auth/register')
         userRegister(@Body() createUserDto: CreateUserDto): User {
         return this.usersService.createUser(createUserDto);
-    } */
-
+    }   
     /* @Post('auth/login')
         userLogin(@Body() loginUserDto: LoginUserDto): LoginResponse {
         return this.usersService.loginUser(loginUserDto);
@@ -54,12 +53,13 @@ export class UsersController {
         return user;
     }
     
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('Admin')
     @Get('admin')
-        getAllUsersAdmin(@Query() paginationQuery: PaginationQueryDto) {
+    getAllUsersAdmin(@Query() paginationQuery: PaginationQueryDto) {
         return this.usersService.getAllUsers(paginationQuery);
     }
+    
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('Admin')
     @Get('admin/:id')
         getUserByIdAdmin(@Param('id') id: string ): User | undefined {
         return this.usersService.getAdminUserById(id);
