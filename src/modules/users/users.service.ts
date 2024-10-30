@@ -63,7 +63,7 @@ export class UsersService {
               password: hash('123456', 10),
               roles: [faker.helpers.arrayElement(['Player', 'Admin'])],
               avatar: faker.image.avatar(),
-              isActive: faker.helpers.arrayElements([true, false], 5)
+              isActive: faker.helpers.arrayElement([true, false])
             });
         }
     }
