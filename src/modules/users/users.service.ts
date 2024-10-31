@@ -54,7 +54,7 @@ export class UsersService {
     }
 
     private generateMockData(): void {
-        for (let i = 0; i < 1000; i++) {
+        for (let i = 0; i < 10; i++) {
             this.users.push({
               userId: uuidv4(),
               name: faker.internet.userName(),
