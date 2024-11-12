@@ -11,6 +11,7 @@ export interface Score {
     score: number;
     game: string;
     isActive: boolean;
+    createdAt: Date;
 }
 
 export interface Paginator {
@@ -30,13 +31,15 @@ export class ScoresService {
     }
 
     private generateMockScoresData(): void {
-        for (let i = 0; i < 1000; i++) {
+        for (let i = 0; i < 30; i++) {
+            
             this.scores.push({
               scoreId: uuidv4(),
               playerId: uuidv4(),
               score: Math.floor(Math.random() * 100),
               game: faker.helpers.arrayElement(['FIFA', 'Call Of Duty', 'Mortal Kombat', 'Final Fantasy', 'Crash']),
               isActive: true,
+              createdAt: faker.date.past()
             });
         }
     }
@@ -44,7 +47,11 @@ export class ScoresService {
     // ============== Score ================
     
     createScore(CreateScoreDto: CreateScoreDto): Score {
-        const newScore = {scoreId: faker.string.uuid(), ...CreateScoreDto};
+        const newScore = {
+            scoreId: faker.string.uuid(),
+            createdAt: new Date(),
+            ...CreateScoreDto
+        };
         this.scores.push(newScore);
         return newScore;
     }
@@ -69,6 +76,20 @@ export class ScoresService {
         return this.scores.find(score => score.scoreId === scoreId);
     }
 
+    updateScore(id: string, updateScoreDto: UpdateScoreDto): Score {
+        const scoreIndex = this.scores.findIndex(score => score.scoreId === id);
+        if (scoreIndex === -1) {
+          return null;
+        }
+        this.scores[scoreIndex] = {...this.scores[scoreIndex], ...updateScoreDto};
+        return this.scores[scoreIndex];
+    }
+
+    leaderBoard(limit: number = 10): Score[] { // Number of scores
+        return this.scores
+            .sort((a, b) => b.score - a.score)
+            .slice(0, limit);
+    }
 
       // ========== Admin Scores ==========  
 
@@ -80,27 +101,17 @@ export class ScoresService {
         this.scores[scoreIndex].isActive = !this.scores[scoreIndex].isActive;
         return this.scores[scoreIndex];
     }
-
-    updateScore(id: string, updateScoreDto: UpdateScoreDto): Score {
-        const scoreIndex = this.scores.findIndex(score => score.scoreId === id);
-        if (scoreIndex === -1) {
-          return null;
-        }
     
-        this.scores[scoreIndex] = {...this.scores[scoreIndex], ...updateScoreDto};
-        return this.scores[scoreIndex];
-      }
-
     adminUpdateScore(id: string, updateScoreDto: UpdateScoreDto): Score {
         const scoreIndex = this.scores.findIndex(score => score.scoreId === id);
-        if (scoreIndex !== -1) {
+        if (scoreIndex === -1) {
             return null;
         }
     
         this.scores[scoreIndex] = {...this.scores[scoreIndex], ...updateScoreDto};
         return this.scores[scoreIndex];
     }
-
+    
     getAdminScoreById(scoreId: string): Score {
         return this.scores.find(score => score.scoreId === scoreId);
     }

@@ -16,9 +16,11 @@ export class ScoresController {
     }
 
     @Get('leaderboard')
-        getScoresLeaderboard(@Query() PaginationQuery: PaginationQueryDto) {
-        return this.scoresService.getAllScores(PaginationQuery);
+    leaderBoard(@Query('limit') limit: string): Score[] {
+        const topScoresLimit = parseInt(limit, 10) || 10;
+        return this.scoresService.leaderBoard(topScoresLimit);
     }
+
     @Put(':scoreId')
         updateScore(@Param('scoreId') id: string, @Body() UpdateScoreDto: UpdateScoreDto): Score {
         return this.scoresService.updateScore(id, UpdateScoreDto);
@@ -50,7 +52,7 @@ export class ScoresController {
         return this.scoresService.adminUpdateScore(id, UpdateScoreDto);
     }
 
-    @Get('admin/:scoreId')
+    @Get('admin/:id')
     getAdminScoreById(@Param('id') id: string ): Score | undefined {
         return this.scoresService.getAdminScoreById(id);
     }

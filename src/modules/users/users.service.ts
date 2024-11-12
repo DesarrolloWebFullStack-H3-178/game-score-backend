@@ -22,10 +22,10 @@ export interface User {
 
 // User login 
 
-/* export interface LoginResponse {
+export interface LoginResponse {
     user: User;
     JWT: string;
-} */
+}
 
 export interface Paginator {
   data: [];
@@ -54,7 +54,7 @@ export class UsersService {
     }
 
     private generateMockData(): void {
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 30; i++) {
             this.users.push({
               userId: uuidv4(),
               name: faker.internet.userName(),
@@ -76,7 +76,7 @@ export class UsersService {
       return newUser;
     }
 
-    /* loginUser(loginUserDto: LoginUserDto): LoginResponse  {
+    loginUser(loginUserDto: LoginUserDto): LoginResponse  {
       const { email, password } = loginUserDto;
       const user = this.users.find(user => user.email === email);
 
@@ -85,7 +85,7 @@ export class UsersService {
       }
       const JWT = faker.string.uuid();
       return {user, JWT};
-    } */
+    }
 
     getUserById(id: string): User {
       return this.users.find(user => user.userId === id);
