@@ -1,119 +1,110 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { v4 as uuidv4 } from 'uuid';
-import { faker } from '@faker-js/faker';
-import { PaginationQueryDto } from 'src/commons/dto/pagination-query.dto';
-import { CreateScoreDto } from './dto/create-score.dto';
-import { UpdateScoreDto } from './dto/update-score.dto';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Scores } from './scores.schema';
+import { CreateScoresDto } from './dto/create-scores.dto';
+import { UpdateScoresDto } from './dto/update-scores.dto';
 
-export interface Score {
-    scoreId: string;
-    playerId: string;
-    score: number;
-    game: string;
-    isActive: boolean;
-    createdAt: Date;
+interface Paginator {
+  data: Scores[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
-
-export interface Paginator {
-    data: [];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  }
 
 @Injectable()
 export class ScoresService {
-    private scores: Score[] = [];
+  constructor(@InjectModel(Scores.name) private scoreModel: Model<Scores>) {}
 
-    constructor() {
-        this.generateMockScoresData();
-    }
+  async getAllScores(limit: number = 10, page: number = 1): Promise<Paginator> {
+    const skip = (page - 1) * limit;
+    const total = await this.scoreModel.countDocuments().exec();
+    const totalPages = Math.ceil(total / limit);
 
-    private generateMockScoresData(): void {
-        for (let i = 0; i < 30; i++) {
-            
-            this.scores.push({
-              scoreId: uuidv4(),
-              playerId: uuidv4(),
-              score: Math.floor(Math.random() * 100),
-              game: faker.helpers.arrayElement(['FIFA', 'Call Of Duty', 'Mortal Kombat', 'Final Fantasy', 'Crash']),
-              isActive: true,
-              createdAt: faker.date.past()
-            });
-        }
-    }
+    const data = await this.scoreModel
+      .find()
+      .skip(skip)
+      .limit(limit)
+      .exec();
 
-    // ============== Score ================
-    
-    createScore(CreateScoreDto: CreateScoreDto): Score {
-        const newScore = {
-            scoreId: faker.string.uuid(),
-            createdAt: new Date(),
-            ...CreateScoreDto
-        };
-        this.scores.push(newScore);
-        return newScore;
-    }
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages,
+    };
+  }
 
-    getAllScores(paginationQuery: PaginationQueryDto): Paginator {
-        const { limit = 10, page = 1 } = paginationQuery;
-        const start = (page - 1) * limit;
-        const end = start + limit;
-        const data = this.scores.slice(start, end);
-        const total = this.scores.length;
-        const totalPages = Math.ceil(total / limit);
-    
-        return <Paginator>{
-          data,
-          total,
-          page,
-          limit,
-          totalPages,
-        }
-    }
-    getScoreById(scoreId: string): Score {
-        return this.scores.find(score => score.scoreId === scoreId);
-    }
+  async createScore(createScoreDto: CreateScoresDto) {
+    const score = new this.scoreModel(createScoreDto);
+    return score.save();
+  }
 
-    updateScore(id: string, updateScoreDto: UpdateScoreDto): Score {
-        const scoreIndex = this.scores.findIndex(score => score.scoreId === id);
-        if (scoreIndex === -1) {
-          return null;
-        }
-        this.scores[scoreIndex] = {...this.scores[scoreIndex], ...updateScoreDto};
-        return this.scores[scoreIndex];
-    }
+  async getScoreById(scoreId: string): Promise<Scores> {
+    const score = await this.scoreModel
+      .findOne({ scoreId })
+      .select({ scoreId: 1, _id: 0, game: 1, score: 1 });
 
-    leaderBoard(limit: number = 10): Score[] { // Number of scores
-        return this.scores
-            .sort((a, b) => b.score - a.score)
-            .slice(0, limit);
+    if (!score) {
+      throw new NotFoundException('Score not found');
     }
+    return score;
+  }
 
-      // ========== Admin Scores ==========  
+  async updateScore(scoreId: string, updateScoreDto: UpdateScoresDto): Promise<Scores> {
+    const updatedScore = await this.scoreModel.findOneAndUpdate(
+      { scoreId },
+      updateScoreDto,
+      { new: true }
+    );
 
-    scoreStatus(scoreId: string): Score {
-        const scoreIndex = this.scores.findIndex(score => score.scoreId === scoreId);
-        if (scoreIndex === -1) {
-            return null;
-        }
-        this.scores[scoreIndex].isActive = !this.scores[scoreIndex].isActive;
-        return this.scores[scoreIndex];
+    if (!updatedScore) {
+      throw new NotFoundException('Score not found');
     }
-    
-    adminUpdateScore(id: string, updateScoreDto: UpdateScoreDto): Score {
-        const scoreIndex = this.scores.findIndex(score => score.scoreId === id);
-        if (scoreIndex === -1) {
-            return null;
-        }
-    
-        this.scores[scoreIndex] = {...this.scores[scoreIndex], ...updateScoreDto};
-        return this.scores[scoreIndex];
-    }
-    
-    getAdminScoreById(scoreId: string): Score {
-        return this.scores.find(score => score.scoreId === scoreId);
+    return updatedScore;
+  }
+
+  async leaderBoard(limit: number = 10): Promise<Scores[]> {
+    return this.scoreModel
+      .find()
+      .sort({ score: -1 }) // Order Max - Min
+      .limit(limit)
+      .exec();
+  }
+
+  async scoreStatus(scoreId: string): Promise<Scores> {
+    const score = await this.scoreModel.findOne({ scoreId });
+
+    if (!score) {
+      throw new NotFoundException('Score not found');
     }
 
+    score.isActive = !score.isActive;
+    await score.save();
+    return score;
+  }
+
+  async adminUpdateScore(scoreId: string, updateScoreDto: UpdateScoresDto): Promise<Scores> {
+    const updatedScore = await this.scoreModel.findOneAndUpdate(
+      { scoreId },
+      updateScoreDto,
+      { new: true }
+    );
+
+    if (!updatedScore) {
+      throw new NotFoundException('Score not found');
+    }
+    return updatedScore;
+  }
+
+  async getAdminScoreById(scoreId: string): Promise<Scores> {
+    const score = await this.scoreModel.findOne({ scoreId });
+
+    if (!score) {
+      throw new NotFoundException('Score not found');
+    }
+    return score;
+  }
 }
