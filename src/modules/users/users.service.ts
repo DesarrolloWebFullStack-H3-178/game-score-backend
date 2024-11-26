@@ -1,4 +1,5 @@
-import { Injectable, UnauthorizedException  } from '@nestjs/common';
+import { Injectable, UnauthorizedException, NotFoundException  } from '@nestjs/common';
+import { PrismaService } from 'prisma/prisma.service';
 import { v4 as uuidv4 } from 'uuid';
 import { faker } from '@faker-js/faker';
 import { PaginationQueryDto } from 'src/commons/dto/pagination-query.dto';
@@ -10,15 +11,26 @@ import { hash, compare } from 'bcryptjs';
 // Create User
 
 export interface User {
-    userId: string;
-    name: string;
-    username: string;
-    email: string;
-    password: string;
-    roles: string[];
-    avatar: string;
-    isActive: boolean;
+  userId: string;
+  name: string;
+  username: string;
+  email: string;
+  password: string;
+  role: string;
+  avatar: string;
+  isActive: boolean;
 }
+
+export interface UserProfile {
+  userId: string;
+  name: string;
+  email: string;
+  username: string;
+  role: string;
+  avatar: string;
+  isActive: boolean;
+  createdAt: Date;
+};
 
 // User login 
 
@@ -27,8 +39,8 @@ export interface LoginResponse {
     JWT: string;
 }
 
-export interface Paginator {
-  data: [];
+export interface Paginator<T> {
+  data: T[];
   total: number;
   page: number;
   limit: number;
@@ -39,7 +51,7 @@ export interface SessionResponse {
   message: string;
   data: {
     userId: string;
-    userName: string;
+    username: string;
     sessionToken: string;
     expiresAt: string;
   };
@@ -49,65 +61,149 @@ export interface SessionResponse {
 export class UsersService {
     private users: User[] = [];
 
-    constructor() {
-        this.generateMockData();
-    }
-
-    private generateMockData(): void {
-        for (let i = 0; i < 30; i++) {
-            this.users.push({
-              userId: uuidv4(),
-              name: faker.internet.userName(),
-              username: faker.internet.userName(),
-              email: faker.internet.email(),
-              password: hash('123456', 10),
-              roles: [faker.helpers.arrayElement(['Player', 'Admin'])],
-              avatar: faker.image.avatar(),
-              isActive: faker.helpers.arrayElement([true, false])
-            });
-        }
-    }
+    constructor( private prisma: PrismaService ) {}
 
     // ========== User  ==========
 
-    createUser(createUserDto: CreateUserDto): User {
-      const newUser = {userId: faker.string.uuid(), ...createUserDto};
-      this.users.push(newUser);
-      return newUser;
+    async createUser(createUserDto: CreateUserDto): Promise<User> {
+      const { password, ...userData } = createUserDto; 
+      const hashedPassword = await hash(password, 10);
+      const newUser = await this.prisma.user.create({
+        data: {
+          ...userData,
+          password: hashedPassword, 
+        },
+      });
+  
+      return {
+        userId: newUser.userId,
+        name: newUser.name,
+        username: newUser.username,
+        email: newUser.email,
+        password: '******', 
+        role: newUser.role,
+        avatar: newUser.avatar,
+        isActive: newUser.isActive,
+      };
     }
 
-    loginUser(loginUserDto: LoginUserDto): LoginResponse  {
+    async loginUser(loginUserDto: LoginUserDto): Promise<LoginResponse> {
       const { email, password } = loginUserDto;
-      const user = this.users.find(user => user.email === email);
-
-      if (!user || user.password !== password) {
-              throw new UnauthorizedException('Email or Password is invalid');
-      }
-      const JWT = faker.string.uuid();
-      return {user, JWT};
-    }
-
-    getUserById(id: string): User {
-      return this.users.find(user => user.userId === id);
-    }
-
-    getAllUsers(paginationQuery: PaginationQueryDto): Paginator {
-        const { limit = 10, page = 1 } = paginationQuery;
-        const start = (page - 1) * limit;
-        const end = start + limit;
-        const data = this.users.slice(start, end);
-        const total = this.users.length;
-        const totalPages = Math.ceil(total / limit);
     
-        return <Paginator>{
-          data,
-          total,
-          page,
-          limit,
-          totalPages,
-        }
+      // Buscar el usuario en la base de datos usando Prisma
+      const user = await this.prisma.user.findUnique({
+        where: { email },
+        select: {
+          userId: true,
+          email: true,
+          password: true,
+          name: true,
+          username: true,
+          role: true,
+          avatar: true,
+          isActive: true,
+        },
+      });
+    
+      if (!user || !(await compare(password, user.password))) {
+        // Si no se encuentra el usuario o la contraseña es incorrecta
+        throw new UnauthorizedException('Email or Password is invalid');
+      }
+    
+      // Generar el JWT (en este caso, el UUID lo utilizamos como un token de ejemplo)
+      const JWT = faker.string.uuid(); 
+    
+      return {
+        user: {
+          userId: user.userId,
+          name: user.name,
+          username: user.username,
+          email: user.email,
+          password: user.password,
+          role: user.role,
+          avatar: user.avatar,
+          isActive: user.isActive,
+        },
+        JWT,
+      };
     }
+    
 
+    async getUserById(id: string): Promise<User | null> {
+      const user = await this.prisma.user.findUnique({
+        where: { userId: id },
+        select: {
+          userId: true,
+          name: true,
+          username: true,
+          email: true,
+          password: true,
+          role: true,
+          avatar: true,
+          isActive: true,
+        },
+      });
+    
+      if (!user) {
+        return null;
+      }
+    
+      return {
+        userId: user.userId,
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        password: '******',
+        role: user.role,
+        avatar: user.avatar,
+        isActive: user.isActive,
+      };
+    }
+    
+    async getAllUsers(paginationQuery: PaginationQueryDto): Promise<Paginator<User>> {
+      const { limit = 10, page = 1 } = paginationQuery;
+      const skip = (page - 1) * limit;
+      const total = await this.prisma.user.count();
+      const totalPages = Math.ceil(total / limit);
+    
+      const limitNumber = Number(limit);
+      const pageNumber = Number(page);
+    
+      const data = await this.prisma.user.findMany({
+        skip: skip,
+        take: limitNumber,
+        select: {
+          userId: true,
+          email: true,
+          name: true,
+          username: true,
+          role: true,
+          avatar: true,
+          isActive: true,
+          createdAt: true,
+        },
+      });
+    
+      const users: User[] = data.map(user => ({
+        userId: user.userId,
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        password: '',
+        role: user.role,
+        avatar: user.avatar,
+        isActive: user.isActive,
+      }));
+    
+      return {
+        data: users,
+        total,
+        page: pageNumber,
+        limit: limitNumber,
+        totalPages,
+      };
+    }
+    
     validateUser(email:string, password:string) {
       const user  = this.users.find(user => user.email === email);
 
@@ -115,24 +211,55 @@ export class UsersService {
         return user;
       }
 
-      return 'No hay user';
+      return 'No User found';
     }
 
-    getProfileUserById(id: string): User {
-      return this.users.find(user => user.userId === id);
+    async getProfileUserById(userId: string): Promise<UserProfile> {
+      const user = await this.prisma.user.findUnique({
+        where: { userId: userId },
+        select: {
+          email: true,
+          userId: true,
+          name: true,
+          username: true,
+          role: true,
+          avatar: true,
+          isActive: true,
+          createdAt: true,
+        },
+      });
+    
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+    
+      return user;
     }
 
-    getSessionUserById(id: string): SessionResponse  {
-      const user = this.users.find(user => user.userId === id);
+    async getSessionUserById(id: string): Promise<SessionResponse> {
+      const user = await this.prisma.user.findUnique({
+        where: { userId: id },
+        select: {
+          email: true,
+          userId: true,
+          name: true,
+          username: true,
+          role: true,
+          avatar: true,
+          isActive: true,
+          createdAt: true,
+        },
+      });
+    
       if (user) {
         const sessionToken = uuidv4();
         const expiresAt = faker.date.future().toISOString();
-  
+    
         return {
           message: 'session logged in successfully',
           data: {
             userId: user.userId,
-            userName: user.username,
+            username: user.username,
             sessionToken,
             expiresAt,
           },
@@ -140,38 +267,162 @@ export class UsersService {
       }
       throw new UnauthorizedException('User session not found');
     }
-    updateUser(id: string, updateUserDto: UpdateUserDto): User {
-      const userIndex = this.users.findIndex(user => user.userId === id);
-      if (userIndex === -1) {
-        return null;
+
+    async updateUser(id: string, updateUserDto: UpdateUserDto): Promise<User | null> {
+      try {
+        const updatedUser = await this.prisma.user.update({
+          where: { userId: id },
+          data: updateUserDto,
+          select: {
+            userId: true,
+            name: true,
+            username: true,
+            email: true,
+            password: true,
+            role: true,
+            avatar: true,
+            isActive: true,
+          },
+        });
+    
+        const user: User = {
+          userId: updatedUser.userId,
+          name: updatedUser.name,
+          username: updatedUser.username,  
+          email: updatedUser.email,
+          password: updatedUser.password,
+          role: updatedUser.role,
+          avatar: updatedUser.avatar,
+          isActive: updatedUser.isActive,
+        };
+    
+        return user;
+      } catch (error) {
+        if (error.code === 'P2025') {
+          throw new NotFoundException('User not found');
+        }
+        throw error;
       }
-  
-      this.users[userIndex] = {...this.users[userIndex], ...updateUserDto};
-      return this.users[userIndex];
     }
 
     // ========== Admin Users ==========  
 
-    adminUpdateUser(id: string, updateUserDto: UpdateUserDto): User {
-      const userIndex = this.users.findIndex(user => user.userId === id);
-      if (userIndex === -1) {
-        return null;
+    async adminUpdateUser(id: string, updateUserDto: UpdateUserDto): Promise<User | null> {
+      try {
+        const updatedUser = await this.prisma.user.update({
+          where: { userId: id },
+          data: updateUserDto,
+          select: {
+            userId: true,
+            name: true,
+            username: true,
+            email: true,
+            password: true,
+            role: true,
+            avatar: true,
+            isActive: true,
+          },
+        });
+    
+        const user: User = {
+          userId: updatedUser.userId,
+          name: updatedUser.name,
+          username: updatedUser.username,
+          email: updatedUser.email,
+          password: updatedUser.password,
+          role: updatedUser.role,
+          avatar: updatedUser.avatar,
+          isActive: updatedUser.isActive,
+        };
+        return user;
+      } catch (error) {
+        if (error.code === 'P2025') {
+          throw new NotFoundException('User not found');
+        }
+        throw error;
       }
-  
-      this.users[userIndex] = {...this.users[userIndex], ...updateUserDto};
-      return this.users[userIndex];
     }
 
-    userStatus(id: string): User {
-      const userIndex = this.users.findIndex(user => user.userId === id);
-      if (userIndex === -1) {
-          return null;
+    async userStatus(id: string): Promise<User | null> {
+      try {
+        const updatedUser = await this.prisma.user.update({
+          where: { userId: id },
+          data: {
+            isActive: {
+              set: !(await this.prisma.user.findUnique({
+                where: { userId: id },
+                select: { isActive: true },
+              })).isActive,
+            },
+          },
+          select: {
+            userId: true,
+            name: true,
+            username: true,
+            email: true,
+            password: true,
+            role: true,
+            avatar: true,
+            isActive: true,
+          },
+        });
+    
+        const user: User = {
+          userId: updatedUser.userId,
+          name: updatedUser.name,
+          username: updatedUser.username,
+          email: updatedUser.email,
+          password: updatedUser.password,
+          role: updatedUser.role,
+          avatar: updatedUser.avatar,
+          isActive: updatedUser.isActive,
+        };
+    
+        return user;
+      } catch (error) {
+        if (error.code === 'P2025') {
+          throw new NotFoundException('User not found');
+        }
+        throw error;
       }
-      this.users[userIndex].isActive = !this.users[userIndex].isActive;
-      return this.users[userIndex];
     }
 
-    getAdminUserById(id: string): User {
-      return this.users.find(user => user.userId === id);
+    async getAdminUserById(id: string): Promise<User | null> {
+      try {
+        const user = await this.prisma.user.findUnique({
+          where: { userId: id },
+          select: {
+            userId: true,
+            name: true,
+            username: true,
+            email: true,
+            password: true,
+            role: true,
+            avatar: true,
+            isActive: true,
+          },
+        });
+    
+        if (!user) {
+          throw new NotFoundException('User not found');
+        }
+        const userData: User = {
+          userId: user.userId,
+          name: user.name,
+          username: user.username,
+          email: user.email,
+          password: user.password,
+          role: user.role,
+          avatar: user.avatar,
+          isActive: user.isActive,
+        };
+
+        return userData;
+      } catch (error) {
+        if (error.code === 'P2025') {
+          throw new NotFoundException('User not found');
+        }
+        throw error;
+      }
     }
 }
